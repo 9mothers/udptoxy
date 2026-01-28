@@ -2,6 +2,8 @@
 
 UDP toxiproxy-style CLI/TUI that forwards UDP bidirectionally between an inbound port and an outbound address while simulating latency, jitter, packet loss, and rate limits in both directions.
 
+![demo](demo.gif)
+
 ## Run
 
 ```bash
