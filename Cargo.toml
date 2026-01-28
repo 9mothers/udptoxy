@@ -1,0 +1,12 @@
+[package]
+name = "udptoxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.55", features = ["derive"] }
+crossterm = "0.29.0"
+parking_lot = "0.12.5"
+rand = "0.9.2"
+ratatui = "0.30.0"
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "net", "time", "macros", "sync"] }
