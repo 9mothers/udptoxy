@@ -42,3 +42,7 @@ The packet table shows direction (`in->out` and `out->in`).
 - `q` quit
 
 Rate adjustments use preset steps (10KB/s .. 100MB/s).
+
+## License
+
+MIT License - Created by [9 Mothers Corporation](https://9mothers.com)
