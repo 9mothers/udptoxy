@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use std::{env, net::UdpSocket, thread, time::Duration};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
