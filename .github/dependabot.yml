@@ -4,8 +4,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      rust-dependencies:
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        update-types:
+          - minor
+          - patch
