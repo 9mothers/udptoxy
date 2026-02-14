@@ -55,9 +55,7 @@ impl TmuxSession {
 
         assert!(status.success(), "tmux new-session failed");
 
-        Self {
-            name: session_name,
-        }
+        Self { name: session_name }
     }
 
     fn capture(&self) -> String {
