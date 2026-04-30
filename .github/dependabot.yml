@@ -5,7 +5,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 10
     groups:
       rust-dependencies:
         update-types:
@@ -17,7 +17,7 @@ updates:
     schedule:
       interval: weekly
     cooldown:
-      default-days: 3
+      default-days: 10
     groups:
       github-actions:
         update-types:
