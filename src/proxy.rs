@@ -402,7 +402,10 @@ async fn response_loop(job: ResponseJob) {
                     let (len, src) = match recv {
                         Ok(value) => value,
                         Err(err) if is_connection_reset(&err) => continue,
-                        Err(_) => break,
+                        Err(_) => {
+                            push_response_error(&events, client_addr, &counter, start);
+                            break;
+                        }
                     };
                     let arrival = Instant::now();
                     let time_in_ms = arrival.duration_since(start).as_millis();
@@ -448,7 +451,10 @@ async fn response_loop(job: ResponseJob) {
                     let (len, src) = match recv {
                         Ok(value) => value,
                         Err(err) if is_connection_reset(&err) => continue,
-                        Err(_) => break,
+                        Err(_) => {
+                            push_response_error(&events, client_addr, &counter, start);
+                            break;
+                        }
                     };
                     let arrival = Instant::now();
                     let time_in_ms = arrival.duration_since(start).as_millis();
@@ -652,6 +658,26 @@ fn push_event(events: &EventBuffer, event: PacketEvent) {
         guard.pop_back();
     }
     guard.push_front(event);
+}
+
+fn push_response_error(
+    events: &EventBuffer,
+    client_addr: SocketAddr,
+    counter: &AtomicU64,
+    start: Instant,
+) {
+    let now = Instant::now();
+    let event = PacketEvent {
+        id: counter.fetch_add(1, Ordering::Relaxed),
+        direction: PacketDirection::OutToIn,
+        time_in_ms: now.duration_since(start).as_millis(),
+        latency_ms: 0,
+        time_out_ms: None,
+        action: PacketAction::Error,
+        size: 0,
+        src: client_addr,
+    };
+    push_event(events, event);
 }
 
 fn is_connection_reset(err: &io::Error) -> bool {
