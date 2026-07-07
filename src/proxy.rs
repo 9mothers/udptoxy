@@ -7,6 +7,7 @@ use rand::RngExt;
 use std::{
     cmp::Ordering as CmpOrdering,
     collections::{BinaryHeap, HashMap},
+    io,
     net::{Ipv4Addr, SocketAddr},
     sync::{
         Arc,
@@ -400,10 +401,8 @@ async fn response_loop(job: ResponseJob) {
                 recv = upstream.recv_from(&mut buf) => {
                     let (len, src) = match recv {
                         Ok(value) => value,
-                        Err(err) => {
-                            eprintln!("upstream recv error for {client_addr}: {err}");
-                            break;
-                        }
+                        Err(err) if is_connection_reset(&err) => continue,
+                        Err(_) => break,
                     };
                     let arrival = Instant::now();
                     let time_in_ms = arrival.duration_since(start).as_millis();
@@ -448,10 +447,8 @@ async fn response_loop(job: ResponseJob) {
                 recv = upstream.recv_from(&mut buf) => {
                     let (len, src) = match recv {
                         Ok(value) => value,
-                        Err(err) => {
-                            eprintln!("upstream recv error for {client_addr}: {err}");
-                            break;
-                        }
+                        Err(err) if is_connection_reset(&err) => continue,
+                        Err(_) => break,
                     };
                     let arrival = Instant::now();
                     let time_in_ms = arrival.duration_since(start).as_millis();
@@ -655,4 +652,8 @@ fn push_event(events: &EventBuffer, event: PacketEvent) {
         guard.pop_back();
     }
     guard.push_front(event);
+}
+
+fn is_connection_reset(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::ConnectionReset
 }
