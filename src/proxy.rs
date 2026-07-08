@@ -7,6 +7,7 @@ use rand::RngExt;
 use std::{
     cmp::Ordering as CmpOrdering,
     collections::{BinaryHeap, HashMap},
+    io,
     net::{Ipv4Addr, SocketAddr},
     sync::{
         Arc,
@@ -167,6 +168,12 @@ struct ResponseJob {
     counter: Arc<AtomicU64>,
     start: Instant,
     shutdown_rx: watch::Receiver<bool>,
+}
+
+enum ResponseRecv {
+    Packet { len: usize, src: SocketAddr },
+    NoResponse,
+    Closed,
 }
 
 #[allow(clippy::map_entry, clippy::too_many_arguments)]
@@ -398,10 +405,16 @@ async fn response_loop(job: ResponseJob) {
                     }
                 }
                 recv = upstream.recv_from(&mut buf) => {
-                    let (len, src) = match recv {
-                        Ok(value) => value,
-                        Err(err) => {
-                            eprintln!("upstream recv error for {client_addr}: {err}");
+                    let (len, src) = match handle_response_recv(
+                        recv,
+                        &events,
+                        client_addr,
+                        &counter,
+                        start,
+                    ) {
+                        ResponseRecv::Packet { len, src } => (len, src),
+                        ResponseRecv::NoResponse => continue,
+                        ResponseRecv::Closed => {
                             break;
                         }
                     };
@@ -446,10 +459,16 @@ async fn response_loop(job: ResponseJob) {
                     }
                 }
                 recv = upstream.recv_from(&mut buf) => {
-                    let (len, src) = match recv {
-                        Ok(value) => value,
-                        Err(err) => {
-                            eprintln!("upstream recv error for {client_addr}: {err}");
+                    let (len, src) = match handle_response_recv(
+                        recv,
+                        &events,
+                        client_addr,
+                        &counter,
+                        start,
+                    ) {
+                        ResponseRecv::Packet { len, src } => (len, src),
+                        ResponseRecv::NoResponse => continue,
+                        ResponseRecv::Closed => {
                             break;
                         }
                     };
@@ -483,6 +502,23 @@ async fn response_loop(job: ResponseJob) {
                     }
                 }
             }
+        }
+    }
+}
+
+fn handle_response_recv(
+    recv: io::Result<(usize, SocketAddr)>,
+    events: &EventBuffer,
+    client_addr: SocketAddr,
+    counter: &AtomicU64,
+    start: Instant,
+) -> ResponseRecv {
+    match recv {
+        Ok((len, src)) => ResponseRecv::Packet { len, src },
+        Err(err) if is_udp_no_response(&err) => ResponseRecv::NoResponse,
+        Err(_) => {
+            record_response_error(events, client_addr, counter, start);
+            ResponseRecv::Closed
         }
     }
 }
@@ -649,10 +685,72 @@ async fn send_packet(job: PacketJob) {
     push_event(&events, event);
 }
 
+fn record_response_error(
+    events: &EventBuffer,
+    client_addr: SocketAddr,
+    counter: &AtomicU64,
+    start: Instant,
+) {
+    let now = Instant::now();
+    let event = PacketEvent {
+        id: counter.fetch_add(1, Ordering::Relaxed),
+        direction: PacketDirection::OutToIn,
+        time_in_ms: now.duration_since(start).as_millis(),
+        latency_ms: 0,
+        time_out_ms: None,
+        action: PacketAction::Error,
+        size: 0,
+        src: client_addr,
+    };
+    push_event(events, event);
+}
+
 fn push_event(events: &EventBuffer, event: PacketEvent) {
     let mut guard = events.lock();
     if guard.len() >= EVENT_BUFFER {
         guard.pop_back();
     }
     guard.push_front(event);
+}
+
+fn is_udp_no_response(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::ConnectionReset
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn connection_reset_is_treated_as_no_response() {
+        let reset = io::Error::from(io::ErrorKind::ConnectionReset);
+        let interrupted = io::Error::from(io::ErrorKind::Interrupted);
+
+        assert!(is_udp_no_response(&reset));
+        assert!(!is_udp_no_response(&interrupted));
+    }
+
+    #[test]
+    fn response_recv_error_records_event_without_stderr() {
+        let events: EventBuffer = Arc::new(Mutex::new(VecDeque::new()));
+        let client_addr = SocketAddr::from(([127, 0, 0, 1], 49152));
+        let counter = AtomicU64::new(7);
+        let start = Instant::now();
+
+        let recv = Err(io::Error::from(io::ErrorKind::PermissionDenied));
+        assert!(matches!(
+            handle_response_recv(recv, &events, client_addr, &counter, start),
+            ResponseRecv::Closed
+        ));
+
+        let guard = events.lock();
+        assert_eq!(guard.len(), 1);
+        assert_eq!(guard[0].id, 7);
+        assert_eq!(guard[0].direction.as_str(), "out->in");
+        assert_eq!(guard[0].action.as_str(), "error");
+        assert_eq!(guard[0].size, 0);
+        assert_eq!(guard[0].src, client_addr);
+        assert!(guard[0].time_out_ms.is_none());
+    }
 }
