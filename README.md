@@ -43,6 +43,12 @@ The packet table shows direction (`in->out` and `out->in`).
 
 Rate adjustments use preset steps (10KB/s .. 100MB/s).
 
+## Contributing
+
+Public contributions should start as GitHub issues for bug reports, feature
+requests, and proposed changes. Pull requests are limited to repository
+collaborators.
+
 ## License
 
 MIT License - Created by [9 Mothers Corporation](https://9mothers.com)
