@@ -89,11 +89,11 @@ fn handle_key(code: KeyCode, settings: &Arc<RwLock<ProxySettings>>, ui: &mut UiS
         KeyCode::Char('q') => return true,
         KeyCode::Char('l') => {
             let mut settings = settings.write();
-            settings.latency_enabled = !settings.latency_enabled;
+            settings.latency_enabled.toggle();
         }
         KeyCode::Char('j') => {
             let mut settings = settings.write();
-            settings.jitter_enabled = !settings.jitter_enabled;
+            settings.jitter_enabled.toggle();
         }
         KeyCode::Char('p') => {
             let mut settings = settings.write();
